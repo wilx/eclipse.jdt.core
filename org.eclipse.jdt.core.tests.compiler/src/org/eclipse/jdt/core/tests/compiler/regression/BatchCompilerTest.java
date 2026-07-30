@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.module.ModuleFinder;
 import java.text.MessageFormat;
 import java.util.Iterator;
 import java.util.List;
@@ -13555,5 +13556,35 @@ public void testReleaseCurrentJdkUsesCtSym() {
 	String release = System.getProperty("java.specification.version");
 	assertTrue(compiler.compile(new String[] { "--release", release, "-d", OUTPUT_DIR, sourceFile }));
 	assertTrue("--release must use ct.sym metadata for the current JDK", compiler.usesCtSymReleaseClasspath());
+}
+public void testReleaseCurrentJdkFiltersVendorModules() {
+	String vendorModule = "openj9.criu";
+	if (!System.getProperty("java.vm.name").contains("OpenJ9")) {
+		return;
+	}
+	assertTrue(
+			"OpenJ9 must provide the vendor module " + vendorModule,
+			ModuleFinder.ofSystem().find(vendorModule).isPresent());
+
+	String[] testFiles = {
+		"X.java",
+		"public class X {}"
+	};
+	String release = System.getProperty("java.specification.version");
+	String sourceFile = "\"" + OUTPUT_DIR + File.separator + "X.java\"";
+	String outputDirectory = "-d \"" + OUTPUT_DIR + "\"";
+
+	runConformTest(
+			testFiles,
+			outputDirectory + " --add-modules " + vendorModule + " " + sourceFile,
+			"",
+			"",
+			true);
+	runNegativeTest(
+			testFiles,
+			outputDirectory + " --release " + release + " --add-modules " + vendorModule + " " + sourceFile,
+			"",
+			"invalid module name: " + vendorModule + "\n",
+			true);
 }
 }
